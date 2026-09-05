@@ -85,7 +85,30 @@ function logImportRun_(fields) {
   }
 }
 
+// DayPlan is the live working document for TODAY's routes only (see
+// SheetsConnector.gs) — ManagerView only ever reads today's rows, so nothing
+// reads or reports on older ones. Clearing them here keeps the tab from
+// accumulating dev/test/prior-day clutter indefinitely. Only rows dated
+// before today are removed, so a same-day re-run of the import never wipes
+// routes techs already built this morning.
+function clearStaleDayPlans_() {
+  const sheet = getSheet_('DayPlan');
+  const rows = sheet.getDataRange().getValues();
+  const today = todayStr_();
+  let cleared = 0;
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (!sameDateStr_(rows[i][DAYPLAN_COL.DATE - 1], today)) {
+      sheet.deleteRow(i + 1);
+      cleared++;
+    }
+  }
+  if (cleared) Logger.log('Cleared ' + cleared + ' stale DayPlan row(s) from before today.');
+  return cleared;
+}
+
 function importWOsFromEmail() {
+  clearStaleDayPlans_();
+
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const afterStr = Utilities.formatDate(cutoff, Session.getScriptTimeZone(), 'yyyy/MM/dd');
 
