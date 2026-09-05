@@ -63,12 +63,37 @@ function mapCsvHeaders_(headerRow) {
   return idx;
 }
 
+// Appends one row to the ImportLog tab, creating it if setupSheets() hasn't
+// been re-run yet. Never throws — a logging failure shouldn't abort the import.
+function logImportRun_(fields) {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    let sheet = ss.getSheetByName('ImportLog');
+    if (!sheet) {
+      sheet = ss.insertSheet('ImportLog');
+      sheet.getRange(1, 1, 1, 7).setValues([[
+        'Timestamp', 'Subjects Found', 'Subjects Missing', 'Header Errors',
+        'New Rows', 'Updated Rows', 'Stale Removed',
+      ]]).setFontWeight('bold');
+    }
+    sheet.appendRow([
+      new Date(), fields.found.join(', '), fields.missing.join(', '),
+      fields.headerErrors.join(' | '), fields.newRows, fields.updatedRows, fields.staleRemoved,
+    ]);
+  } catch (e) {
+    Logger.log('logImportRun_ failed: ' + e.message);
+  }
+}
+
 function importWOsFromEmail() {
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const afterStr = Utilities.formatDate(cutoff, Session.getScriptTimeZone(), 'yyyy/MM/dd');
 
   const parsedWOs = {}; // woNumber -> row array (last one wins if duplicated across realms)
   let attachmentsSeen = 0;
+  const subjectsFound = [];
+  const subjectsMissing = [];
+  const headerErrors = [];
 
   for (const subject of ROUTING_SUBJECTS) {
     const query = 'from:' + APPFOLIO_SENDER + ' subject:"' + subject + '" after:' + afterStr;
@@ -76,8 +101,10 @@ function importWOsFromEmail() {
 
     if (!threads.length) {
       Logger.log('No email found today for: ' + subject);
+      subjectsMissing.push(subject);
       continue;
     }
+    subjectsFound.push(subject);
 
     const messages = threads[0].getMessages();
     const latest = messages[messages.length - 1];
@@ -93,6 +120,7 @@ function importWOsFromEmail() {
         idx = mapCsvHeaders_(rows[0]);
       } catch (e) {
         Logger.log('Skipping attachment "' + att.getName() + '" (subject "' + subject + '"): ' + e.message);
+        headerErrors.push(subject + ': ' + e.message);
         continue;
       }
       attachmentsSeen++;
@@ -122,6 +150,10 @@ function importWOsFromEmail() {
 
   if (!Object.keys(parsedWOs).length) {
     Logger.log('No WOs parsed — nothing to import. Attachments seen: ' + attachmentsSeen);
+    logImportRun_({
+      found: subjectsFound, missing: subjectsMissing, headerErrors,
+      newRows: 0, updatedRows: 0, staleRemoved: 0,
+    });
     return;
   }
 
@@ -168,6 +200,10 @@ function importWOsFromEmail() {
   }
 
   Logger.log('WO import done — ' + newRows.length + ' new, ' + updatedCount + ' updated, ' + attachmentsSeen + ' attachments processed.');
+  logImportRun_({
+    found: subjectsFound, missing: subjectsMissing, headerErrors,
+    newRows: newRows.length, updatedRows: updatedCount, staleRemoved: staleEntries.length,
+  });
 }
 
 function createDailyImportTrigger() {

@@ -248,6 +248,7 @@ function setupSheets() {
     DayPlan:        ['Date', 'Tech', 'Plan JSON', 'Updated At'],
     Config:         ['Key', 'Value'],
     ManagerView:    [],
+    ImportLog:      ['Timestamp', 'Subjects Found', 'Subjects Missing', 'Header Errors', 'New Rows', 'Updated Rows', 'Stale Removed'],
   };
 
   for (const [name, headers] of Object.entries(tabs)) {
