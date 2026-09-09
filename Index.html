@@ -217,7 +217,7 @@
           group: { name: 'myday', pull: 'clone', put: false },
           sort: false,
           animation: 150,
-          handle: '.grip',
+          handle: '.grip-handle',
         });
       }
     }).withFailureHandler(showError).loadOpenWorkOrderPool(TECH, filters, sortMode);
@@ -246,7 +246,7 @@
             '<div class="pool-card-meta">' + escapeHtml(wo.jobDesc || '') + '</div>' +
           '</div>' +
           '<svg class="schedule-toggle" data-action="toggle-schedule" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>' +
-          '<svg class="grip" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg>' +
+          '<div class="grip-handle"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg></div>' +
         '</div>' +
         '<div class="schedule-editor" hidden>' +
           '<span class="lbl">Window:</span>' +

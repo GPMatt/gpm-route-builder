@@ -70,15 +70,18 @@
   .pool-card-addr { font-size: 13.5px; font-weight: 700; }
   .pool-card-meta { font-size: 11.5px; color: var(--mid2); margin-top: 1px; }
   .pool-card-meta .urgent-txt { color: var(--urgent); font-weight: 700; }
-  /* Drag handle — the only part of a pool card that picks the card up.
-     Negative margin pads the touch target well past the visible glyph
-     without disturbing the row's layout; touch-action: none stops iOS from
-     also trying to scroll/zoom on this element so Sortable's own pointer
-     handling gets an unambiguous first touch. */
-  .grip {
-    flex-shrink: 0; color: var(--mid2); cursor: grab;
-    padding: 10px; margin: -10px; touch-action: none;
+  /* Drag handle — the only part of a pool card that picks the card up. A
+     real sized box (not a negative-margin hit-slop hack — that collapsed
+     to nothing on iOS Safari) so it's a legible ~34px touch target on
+     iPad. touch-action: none stops iOS from also trying to scroll/zoom on
+     this element so Sortable's own pointer handling gets an unambiguous
+     first touch. */
+  .grip-handle {
+    flex-shrink: 0; width: 34px; height: 34px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--mid2); cursor: grab; touch-action: none;
   }
+  .grip-handle svg { display: block; }
   .schedule-toggle { flex-shrink: 0; color: var(--appt); cursor: pointer; }
   .schedule-editor {
     margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e6cf9e;
