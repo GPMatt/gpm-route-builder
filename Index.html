@@ -233,7 +233,8 @@
       if (!wo.assignedUser && !wo.isScheduledToday) metaBits.push('Urgent-eligible');
       el.innerHTML =
         '<div class="pool-card-row">' +
-          '<div style="flex:1;min-width:0;">' +
+          '<div style="flex:1;min-width:0;" data-action="open-details">' +
+            '<div class="stop-wo">WO# ' + escapeHtml(wo.woNumber) + '</div>' +
             '<div class="pool-card-addr">' + escapeHtml(wo.address) + (wo.unit ? ', ' + escapeHtml(wo.unit) : '') + '</div>' +
             '<div class="pool-card-meta">' + escapeHtml(wo.jobDesc || '') + '</div>' +
           '</div>' +
@@ -248,6 +249,10 @@
           '<button type="button" class="btn-confirm-sched" data-action="save-schedule" style="margin-left:auto;">Flag Scheduled</button>' +
         '</div>';
       wireTimeAutofill(el.querySelector('.schedule-editor'));
+      el.querySelector('[data-action="open-details"]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openWoModal(wo);
+      });
       el.querySelector('[data-action="toggle-schedule"]').addEventListener('click', (e) => {
         e.stopPropagation();
         el.querySelector('.schedule-editor').hidden = !el.querySelector('.schedule-editor').hidden;
@@ -774,10 +779,13 @@
     return wrap;
   }
 
-  // Full-detail popup for a Review & Go stop, opened by tapping its address —
-  // the card itself only ever shows the WO# and address, everything else
-  // (description, maintenance limit, status notes, assignment) lives here.
+  // Full-detail popup for a work order card (Open WO pool or a Review & Go
+  // stop), opened by tapping its address — the card itself only ever shows
+  // the WO# and address, everything else (description, maintenance limit,
+  // status notes, assignment) lives here. `stop` is optional — the pool has
+  // no stop/window context, only Review & Go stops do.
   function openWoModal(wo, stop) {
+    stop = stop || {};
     const limitVal = parseFloat(wo.maintenanceLimit);
     const hasLimit = !isNaN(limitVal) && limitVal > 0;
     let html = '<div class="wo-modal-wo">WO# ' + escapeHtml(wo.woNumber || stop.woNumber) + '</div>' +
