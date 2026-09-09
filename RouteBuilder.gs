@@ -136,6 +136,18 @@ function buildRoute(techName, dateStr, urgent, scheduled, buckets) {
   return saveDayPlan(techName, dateStr, plan);
 }
 
+// Backs a built plan out to 'building' so the tech can revisit their Build
+// My Day selections and build again — urgent/scheduled/buckets are still
+// sitting on the plan from the last buildRoute() call, so nothing about the
+// draft is lost, only `route`/completion state (which a rebuild replaces
+// wholesale anyway, same as the very first build).
+function backToBuildMyDay(techName, dateStr) {
+  const plan = loadDayPlan(techName, dateStr);
+  if (!plan) throw new Error('No plan found for ' + techName + ' on ' + dateStr);
+  plan.status = 'building';
+  return saveDayPlan(techName, dateStr, plan);
+}
+
 // ── Phase 3: Review & Go — live edits ───────────────────────────────────────
 
 function estimateDriveMinutes_(addrA, addrB) {
@@ -265,22 +277,4 @@ function getDayStats(techName, dateStr) {
       ? { woNumber: nextScheduled.woNumber, windowStart: nextScheduled.windowStart, windowEnd: nextScheduled.windowEnd }
       : null,
   };
-}
-
-// insertAfterWoNumber: null/empty inserts at the end
-function addStopToRoute(techName, dateStr, woNumber, insertAfterWoNumber) {
-  const plan = loadDayPlan(techName, dateStr);
-  if (!plan) throw new Error('No route found for ' + techName + ' on ' + dateStr);
-
-  const newStop = { woNumber, type: 'todo', complete: false };
-  const idx = insertAfterWoNumber ? plan.route.findIndex(s => s.woNumber === insertAfterWoNumber) : -1;
-  if (idx === -1) {
-    plan.route.push(newStop);
-  } else {
-    plan.route.splice(idx + 1, 0, newStop);
-  }
-
-  const warnings = checkRouteFeasibility_(plan.route);
-  saveDayPlan(techName, dateStr, plan);
-  return { plan, warnings };
 }

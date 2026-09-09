@@ -68,6 +68,9 @@
 <!-- ── Screen 2: Review & Go ── -->
 <div id="screen-review" class="app" hidden>
   <header>
+    <button type="button" id="btn-back-to-day" class="header-back-btn" aria-label="Back to Build My Day">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+    </button>
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6abf4b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"></circle><circle cx="18" cy="18" r="2.5"></circle><path d="M8 7h6a3 3 0 0 1 3 3v0a3 3 0 0 1-3 3H8"></path></svg>
     <div class="title">Today's Route</div>
     <div class="subtitle" id="review-header-sub"></div>
@@ -116,6 +119,13 @@
   let filters = { myProperties: false, scheduledOnly: false, assignedToMe: false };
   let sortMode = 'newest';
   let poolCache = {}; // woNumber -> wo object, refreshed on every pool load
+  // Build My Day's zone DOM (urgent/scheduled/bucket dropzones) is only ever
+  // populated once per page load — showScreen() just toggles [hidden], it
+  // never tears the screen down — so restoreDraft() must never run a second
+  // time or every WO would be appended twice. This tracks whether that
+  // one-time populate has happened yet, regardless of which screen (day or
+  // a straight-to-Review boot) triggers it first.
+  let dayScreenInitialized = false;
 
   // ── Boot ───────────────────────────────────────────────────────────────
   window.onload = function () {
@@ -161,6 +171,7 @@
         initZones();
         if (plan) restoreDraft(plan);
         updateBuildButton();
+        dayScreenInitialized = true;
       }
     }).withFailureHandler(showError).loadPlan(TECH, TODAY);
 
@@ -177,6 +188,29 @@
       renderPool();
     });
     document.getElementById('btn-build-route').addEventListener('click', onBuildRoute);
+    document.getElementById('btn-back-to-day').addEventListener('click', backToDayScreen);
+  }
+
+  // Backs out of an already-built route to Build My Day so the tech can
+  // change their selections and build again. Build My Day's zone DOM is
+  // never torn down by showScreen() (it only toggles [hidden]) — so if this
+  // is the same session that built the route, the draft is still sitting
+  // there exactly as left and needs no repopulating. The only case that
+  // needs a real (one-time) populate is landing here from a page load that
+  // went straight to Review (loadPlan came back already 'built'), which
+  // never ran initZones()/restoreDraft() at all.
+  function backToDayScreen() {
+    google.script.run.withSuccessHandler(plan => {
+      showScreen('day');
+      renderPool();
+      if (!dayScreenInitialized) {
+        initZones();
+        restoreDraft(plan);
+        dayScreenInitialized = true;
+      }
+      document.getElementById('btn-build-route').textContent = 'Build Route';
+      updateBuildButton();
+    }).withFailureHandler(showError).backToBuildMyDay(TECH, TODAY);
   }
 
   function showScreen(name) {
@@ -243,7 +277,6 @@
           '<div style="flex:1;min-width:0;" data-action="open-details">' +
             '<div class="stop-wo">WO# ' + escapeHtml(wo.woNumber) + '</div>' +
             '<div class="pool-card-addr">' + escapeHtml(wo.address) + (wo.unit ? ', ' + escapeHtml(wo.unit) : '') + '</div>' +
-            '<div class="pool-card-meta">' + escapeHtml(wo.jobDesc || '') + '</div>' +
           '</div>' +
           '<svg class="schedule-toggle" data-action="toggle-schedule" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>' +
           '<div class="grip-handle"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"></circle><circle cx="15" cy="6" r="1.6"></circle><circle cx="9" cy="12" r="1.6"></circle><circle cx="15" cy="12" r="1.6"></circle><circle cx="9" cy="18" r="1.6"></circle><circle cx="15" cy="18" r="1.6"></circle></svg></div>' +
@@ -386,7 +419,7 @@
   // ── Zones ────────────────────────────────────────────────────────────
   function initZones() {
     const urgentZone = document.getElementById('zone-urgent');
-    new Sortable(urgentZone, {
+    if (!urgentZone.sortableInstance) urgentZone.sortableInstance = new Sortable(urgentZone, {
       group: 'myday', animation: 150,
       onAdd: (evt) => {
         if (rejectIfDuplicate(evt.item)) return;
@@ -396,7 +429,7 @@
     });
 
     const schedZone = document.getElementById('zone-scheduled');
-    new Sortable(schedZone, {
+    if (!schedZone.sortableInstance) schedZone.sortableInstance = new Sortable(schedZone, {
       group: 'myday', animation: 150, sort: false,
       onAdd: (evt) => {
         if (rejectIfDuplicate(evt.item)) return;
@@ -627,7 +660,7 @@
     const addBtn = document.createElement('button');
     addBtn.className = 'add-wo-btn';
     addBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg> Add a work order';
-    addBtn.addEventListener('click', onAddWorkOrder);
+    addBtn.addEventListener('click', backToDayScreen);
     list.appendChild(addBtn);
 
     if (!routeList) {
@@ -844,23 +877,6 @@
     card.addEventListener('touchmove', onMove, { passive: true });
     window.addEventListener('mouseup', onUp);
     card.addEventListener('touchend', onUp);
-  }
-
-  function onAddWorkOrder() {
-    google.script.run.withSuccessHandler(wos => {
-      const used = new Set(Array.from(document.querySelectorAll('.stop-swipe-wrap')).map(el => el.dataset.wo));
-      const available = wos.filter(w => !used.has(w.woNumber));
-      if (!available.length) { showToast('No other open work orders to add'); return; }
-      const pick = window.prompt('Add which WO #? \n' + available.slice(0, 15).map(w => w.woNumber + ' — ' + w.address).join('\n'));
-      if (!pick) return;
-      const match = available.find(w => w.woNumber === pick.trim());
-      if (!match) { showToast('WO not found in list'); return; }
-      poolCache[match.woNumber] = match;
-      google.script.run.withSuccessHandler(res => {
-        renderReview(res.plan);
-        if (res.warnings && res.warnings.length) showToast(res.warnings[0]);
-      }).withFailureHandler(showError).addStopToRoute(TECH, TODAY, match.woNumber, null);
-    }).withFailureHandler(showError).loadOpenWorkOrderPool(TECH, {}, 'newest');
   }
 
   function refreshDayStats() {

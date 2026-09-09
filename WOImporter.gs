@@ -184,7 +184,7 @@ function importWOsFromEmail() {
   const existing = sheet.getDataRange().getValues();
   const woRowMap = {};
   for (let i = 1; i < existing.length; i++) {
-    const n = String(existing[i][WO_COL.WO_NUMBER - 1]).trim();
+    const n = parseWoNumber_(existing[i][WO_COL.WO_NUMBER - 1]);
     if (n) woRowMap[n] = i + 1;
   }
 
@@ -209,6 +209,12 @@ function importWOsFromEmail() {
     if (woRowMap[woNum]) {
       // Columns 1-10 come from AppFolio and are safe to overwrite in place;
       // columns 11-13 (GPM scheduling fields) are never touched here.
+      // Format-before-write: a bare-integer WO Number (e.g. "9273") written
+      // to a still-General-format cell gets silently reinterpreted by
+      // Sheets as a year (see parseWoNumber_) — forcing text format right
+      // before setValues is what actually prevents that, changing format
+      // after the fact wouldn't undo an already-mangled cell.
+      setWoNumberColumnAsText_(sheet, woRowMap[woNum], 1);
       sheet.getRange(woRowMap[woNum], 1, 1, sheetRow.length).setValues([sheetRow]);
       updatedCount++;
     } else {
@@ -219,7 +225,9 @@ function importWOsFromEmail() {
   }
 
   if (newRows.length > 0) {
-    sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+    const startRow = sheet.getLastRow() + 1;
+    setWoNumberColumnAsText_(sheet, startRow, newRows.length);
+    sheet.getRange(startRow, 1, newRows.length, newRows[0].length).setValues(newRows);
   }
 
   Logger.log('WO import done — ' + newRows.length + ' new, ' + updatedCount + ' updated, ' + attachmentsSeen + ' attachments processed.');
@@ -272,7 +280,7 @@ function seedSampleData() {
   const existing = sheet.getDataRange().getValues();
   const woRowMap = {};
   for (let i = 1; i < existing.length; i++) {
-    const n = String(existing[i][WO_COL.WO_NUMBER - 1]).trim();
+    const n = parseWoNumber_(existing[i][WO_COL.WO_NUMBER - 1]);
     if (n) woRowMap[n] = i + 1;
   }
 

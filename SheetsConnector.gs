@@ -39,6 +39,18 @@ function getSheet_(name) {
   return sheet;
 }
 
+// Root-cause fix for the bare-integer-WO-Number-becomes-a-Date bug (see
+// parseWoNumber_ above): a General-format cell lets Sheets silently
+// reinterpret a plain number as a year on write. Forcing the column to
+// plain-text format stops that at the source. Called both from
+// setupSheets() (whole column, once) and inline before every importer
+// write (covers a sheet that predates this fix without needing a manual
+// setupSheets() re-run first).
+function setWoNumberColumnAsText_(sheet, startRow, numRows) {
+  if (numRows <= 0) return;
+  sheet.getRange(startRow, WO_COL.WO_NUMBER, numRows, 1).setNumberFormat('@');
+}
+
 function getConfig_(key) {
   const sheet = getSheet_('Config');
   const data = sheet.getDataRange().getValues();
@@ -97,6 +109,21 @@ function toPlain_(v) {
   return (v instanceof Date) ? v.toISOString() : v;
 }
 
+// A bare-integer WO Number with no letter/dash suffix (e.g. "9273") reads
+// back from Sheets as a Date, not a string — Sheets' own autocomplete
+// silently reinterprets a plain 4-digit-ish number as a year and stores
+// "Jan 1, <that number>" instead of text, the moment it's written by
+// setValues() to a General-format cell. import now force-formats this
+// column as plain text (see setWoNumberColumnAsText_) so this shouldn't
+// recur, but every *read* of a WO Number still has to tolerate a Date
+// already sitting in an existing row from before that fix landed — the
+// original integer is exactly the year component, so it's fully
+// recoverable rather than showing a raw Date.toString() garbage string.
+function parseWoNumber_(raw) {
+  if (raw instanceof Date) return String(raw.getFullYear());
+  return String(raw).trim();
+}
+
 function rowToWO_(row) {
   const apptDate = parseAppFolioSchedText_(row[WO_COL.APPFOLIO_SCHED_TEXT - 1]);
   // Stale AppFolio appointment dates (before today) are disregarded entirely —
@@ -107,7 +134,7 @@ function rowToWO_(row) {
   const gpmWindowIsToday = sameDateStr_(gpmSchedDate, todayStr_());
 
   return {
-    woNumber:         String(row[WO_COL.WO_NUMBER - 1]),
+    woNumber:         parseWoNumber_(row[WO_COL.WO_NUMBER - 1]),
     address:          toPlain_(row[WO_COL.PROPERTY_ADDRESS - 1]),
     unit:             toPlain_(row[WO_COL.UNIT - 1]),
     jobDesc:          toPlain_(row[WO_COL.JOB_DESC - 1]),
@@ -159,7 +186,7 @@ function flagWorkOrderScheduled(woNumber, windowStart, windowEnd) {
   const sheet = getSheet_('WorkOrders');
   const rows = sheet.getDataRange().getValues();
   for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][WO_COL.WO_NUMBER - 1]) === String(woNumber)) {
+    if (parseWoNumber_(rows[i][WO_COL.WO_NUMBER - 1]) === String(woNumber)) {
       sheet.getRange(i + 1, WO_COL.GPM_SCHED_DATE).setValue(todayStr_());
       sheet.getRange(i + 1, WO_COL.GPM_SCHED_START).setValue(windowStart);
       sheet.getRange(i + 1, WO_COL.GPM_SCHED_END).setValue(windowEnd);
@@ -258,6 +285,9 @@ function setupSheets() {
       sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
     }
   }
+
+  const woSheet = ss.getSheetByName('WorkOrders');
+  setWoNumberColumnAsText_(woSheet, 2, woSheet.getMaxRows() - 1);
 
   const configSheet = ss.getSheetByName('Config');
   if (configSheet.getDataRange().getNumRows() < 2) {
