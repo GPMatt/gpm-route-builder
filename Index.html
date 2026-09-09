@@ -207,10 +207,17 @@
       });
 
       if (!list.sortableInstance) {
+        // handle: '.grip' — without this, any touch-drag on a card (including
+        // a plain vertical scroll attempt) is captured as a pick-up-the-card
+        // gesture, so the pool list can never be scrolled by finger on iPad.
+        // Restricting pickup to the small grip icon frees the rest of the
+        // card for native scrolling; the whole card still moves once a drag
+        // starts, only the *start* trigger is narrowed.
         list.sortableInstance = new Sortable(list, {
           group: { name: 'myday', pull: 'clone', put: false },
           sort: false,
           animation: 150,
+          handle: '.grip',
         });
       }
     }).withFailureHandler(showError).loadOpenWorkOrderPool(TECH, filters, sortMode);

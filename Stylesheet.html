@@ -55,18 +55,30 @@
   }
   .filter-chip.active { background: var(--green); color: #fff; border-color: var(--green); }
   .sort-row { display: flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; color: var(--mid2); margin-top: 8px; cursor: pointer; user-select: none; }
-  .pool-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 7px; margin-top: 12px; padding-bottom: 8px; }
+  /* pan-y: the list only ever needs vertical scroll — leaves that gesture to
+     the browser's native scroller everywhere except the .grip handle below,
+     which opts back out with touch-action: none so a touch there starts a
+     Sortable drag instead of a scroll. */
+  .pool-list { flex: 1; overflow-y: auto; touch-action: pan-y; display: flex; flex-direction: column; gap: 7px; margin-top: 12px; padding-bottom: 8px; }
 
   .pool-card {
     background: var(--card); border-radius: var(--radius); border: 1.5px solid var(--light);
-    padding: 10px 10px 10px 12px; cursor: grab;
+    padding: 10px 10px 10px 12px;
   }
-  .pool-card.used { background: #f1efe9; border-color: #e4dcca; opacity: .6; cursor: default; }
+  .pool-card.used { background: #f1efe9; border-color: #e4dcca; opacity: .6; }
   .pool-card-row { display: flex; align-items: center; gap: 9px; }
   .pool-card-addr { font-size: 13.5px; font-weight: 700; }
   .pool-card-meta { font-size: 11.5px; color: var(--mid2); margin-top: 1px; }
   .pool-card-meta .urgent-txt { color: var(--urgent); font-weight: 700; }
-  .grip { flex-shrink: 0; color: var(--mid2); }
+  /* Drag handle — the only part of a pool card that picks the card up.
+     Negative margin pads the touch target well past the visible glyph
+     without disturbing the row's layout; touch-action: none stops iOS from
+     also trying to scroll/zoom on this element so Sortable's own pointer
+     handling gets an unambiguous first touch. */
+  .grip {
+    flex-shrink: 0; color: var(--mid2); cursor: grab;
+    padding: 10px; margin: -10px; touch-action: none;
+  }
   .schedule-toggle { flex-shrink: 0; color: var(--appt); cursor: pointer; }
   .schedule-editor {
     margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e6cf9e;
